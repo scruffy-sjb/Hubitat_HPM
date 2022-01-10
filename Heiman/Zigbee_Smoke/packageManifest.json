@@ -1,0 +1,16 @@
+{
+  "packageName": "Heiman Zigbee Smoke Detector Driver",
+  "author": "Scruffy-SJB",
+  "version": "2.1",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2021-11-04",
+  "drivers": [
+    {
+      "id": "205fd2e1-8652-4f62-9a8c-e4c8f758b5a5",
+      "name": "Heiman Zigbee Smoke Detector",
+      "namespace": "scruffy-sjb",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/Zigbee_Smoke/Zigbee_Smoke",
+      "required": true
+    }
+  ]
+}
