@@ -1,0 +1,16 @@
+{
+  "packageName": "Heiman Z-Wave Smoke Detector Driver",
+  "author": "Scruffy-SJB",
+  "version": "1.5",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2021-11-03",
+  "drivers": [
+    {
+      "id": "f9e05d2d-74f9-4ca2-8545-df8cc2c4a64d",
+      "name": "Heiman Z-Wave Smoke Detector",
+      "namespace": "scruffy-sjb",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/Zwave_Smoke/Zwave_Smoke",
+      "required": true
+    }
+  ]
+}
