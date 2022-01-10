@@ -1,0 +1,68 @@
+{
+  "author": "Scruffy-SJB",
+  "gitHubUrl": "https://github.com/scruffy-sjb",
+  "packages": [
+    {
+      "id": "b029908a-cac9-4b73-9fde-de4bc8f0d18e",
+      "name": "Fakro Window Driver",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Fakro/packageManifest.json",
+      "description": "Fakro Z-Wave Window Driver",
+      "tags": [
+        "ZWave",
+        "Doors & Windows"
+      ]
+    },
+    {
+      "id": "93ad2c86-f6ae-4564-b160-0d68b5ee2327",
+      "name": "Aeotec Eurotronic Spirit eTRV Driver",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Aeotec/packageManifest.json",
+      "description": "Aeotec Eurotronic Spirit eTRV Driver",
+      "tags": [
+        "ZWave",
+        "Climate Control",
+        "Temperature & Humidity"
+      ]
+    },
+    {
+      "id": "e790ca78-28b8-43e5-b2ae-88a2e0d7376b",
+      "name": "Heiman Z-Wave Smoke Detector Driver",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/ZWave_Smoke/packageManifest.json",
+      "description": "Heiman Z-Wave Smoke Detector Driver",
+      "tags": [
+        "ZWave",
+        "Alarm Systems",
+        "Monitoring",
+        "Safety & Security"
+      ]
+    },
+    {
+      "id": "a9d81226-d811-4c35-b854-75aed93e35d2",
+      "name": "Heiman Zigbee Smoke Detector Driver",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/Zigbee_Smoke/packageManifest.json",
+      "description": "Heiman Zigbee Smoke Detector Driver",
+      "tags": [
+        "Zigbee",
+        "Alarm Systems",
+        "Monitoring",
+        "Safety & Security"
+      ]
+    },
+    {
+      "id": "60e9db16-52e1-4714-8494-6e3d9b627d6d",
+      "name": "Heiman Zigbee CO Detector Driver",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/Zigbee_CO/packageManifest.json",
+      "description": "Heiman Zigbee CO Detector Driver",
+      "tags": [
+        "Zigbee",
+        "Alarm Systems",
+        "Monitoring",
+        "Safety & Security"
+      ]
+    }
+  ]
+}
