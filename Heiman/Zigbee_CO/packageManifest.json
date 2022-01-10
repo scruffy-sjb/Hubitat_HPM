@@ -1,0 +1,16 @@
+{
+  "packageName": "Heiman Zigbee CO Detector Driver",
+  "author": "Scruffy-SJB",
+  "version": "1.0",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2021-11-11",
+  "drivers": [
+    {
+      "id": "fe0d17e3-07f1-4e8c-ae9c-7d893da1d3dd",
+      "name": "Heiman Zigbee CO Detector",
+      "namespace": "scruffy-sjb",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/Zigbee_CO/Zigbee_CO",
+      "required": true
+    }
+  ]
+}
