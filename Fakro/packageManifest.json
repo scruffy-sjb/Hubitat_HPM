@@ -1,0 +1,16 @@
+{
+  "packageName": "Fakro Window Driver",
+  "author": "Scruffy-SJB",
+  "version": "1.0",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2021-09-19",
+  "drivers": [
+    {
+      "id": "37963257-461a-4a20-8b8d-833f7529a945",
+      "name": "Fakro Window Driver",
+      "namespace": "Scruffy-sjb",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Fakro/Window_Driver",
+      "required": true
+    }
+  ]
+}
