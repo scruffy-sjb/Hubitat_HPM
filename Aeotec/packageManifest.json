@@ -1,0 +1,16 @@
+{
+  "packageName": "Aeotec Eurotronic Spirit eTRV",
+  "author": "Scruffy-SJB",
+  "version": "1.9",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2021-06-25",
+  "drivers": [
+    {
+      "id": "9c445f11-f3b5-448a-ae8d-e23cba5334f4",
+      "name": "Aeotec eTRV",
+      "namespace": "scruffy-sjb",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Aeotec/eTRV",
+      "required": true
+    }
+  ]
+}
