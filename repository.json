@@ -29,7 +29,7 @@
       "id": "e790ca78-28b8-43e5-b2ae-88a2e0d7376b",
       "name": "Heiman Z-Wave Smoke Detector Driver",
       "category": "Integrations",
-      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/ZWave_Smoke/packageManifest.json",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Heiman/Zwave_Smoke/packageManifest.json",
       "description": "Heiman Z-Wave Smoke Detector Driver",
       "tags": [
         "ZWave",
