@@ -1,0 +1,676 @@
+/*
+SRT321 Thermostat by Scruffy-SJB
+
+    Version 2.1  November 20 2020 - Added Z-Wave Plus Fingerprint
+            2.2  December 31 2020 - Minor cosmetic tweaks, less debug statements into logs 
+                                                         - Minimum wakeup interval enforced
+            2.3  January 7 2021 - Fixed bug with some versions of SRT321 not getting their configuration after I added the Z-Wave+ bits
+            2.4  April 17 2022 - Added LastTemp and LastCheckin Status, various other minor improvements
+*/
+
+metadata {
+    definition (name: "Secure SRT321 Thermostat", namespace: "scruffy-sjb", author: "Simon Burke")
+    {
+
+    capability "Actuator"
+    capability "Temperature Measurement"
+    capability "Thermostat"
+    capability "Switch"
+    capability "Configuration"
+    capability "Polling"
+    capability "Sensor"
+    capability "Health Check"
+    capability "Battery"
+    capability "Refresh"
+
+	command "configure"
+    command "resetBatteryReplacedDate"        
+	command "setTemperature"
+	command "setTempUp"
+	command "setTempDown"
+        
+	attribute "batteryLastReplaced", "string"
+    attribute "LastWakeUp", "string"
+    attribute "LastTemp", "string"
+    attribute "DeviceWakeUpSeconds", "string"
+        
+    fingerprint mfr:"0059", prod:"0001", deviceId:"0003", inClusters:"0x72,0x86,0x80,0x84,0x31,0x43,0x85,0x70", outClusters:"0x40,0x25", deviceJoinName: "Secure SRT321 Z-Wave Thermostat" 
+    fingerprint mfr:"0059", prod:"0001", deviceId:"0005", inClusters:"0x5E,0x72,0x86,0x80,0x84,0x31,0x43,0x85,0x70,0x5A,0x73,0x59,0x42,0x40,0x20", outClusters:"0x40,0x25", deviceJoinName: "Secure SRT321 Z-Wave+ Thermostat" 
+}
+
+	main "heatingSetpoint"
+        details(["heatingSetpoint", "battery", "refresh", "configure", "temperature", "mode"])
+
+preferences {
+    input "userWakeUpInterval", "number", title: "Wakeup interval...", description: "Wake Up Interval (seconds)", defaultValue: 900, required: false, displayDuringSetup: false
+    }
+}
+
+// ============================================================================================================================
+//                        Device Handler Methods
+// ============================================================================================================================
+
+def parse(String description) {
+	def result = []
+	if (description.startsWith("Err")) {
+	    result << createEvent(descriptionText:description, displayed:true)
+	} else {
+		def cmd = zwave.parse(description, commandClassVersions)
+		if (cmd) {
+			result = zwaveEvent(cmd)
+             // log.debug "${description} -->Parsed ${cmd} to ${result.inspect()}"
+        } else {
+            log.debug "Non-parsed event: ${description}"
+        }
+	}
+        
+	return result
+}
+
+def installed() {
+    log.debug "${device.displayName} preferences installed"
+    configure()
+}
+
+def updated() {
+    log.debug "${device.displayName} preferences updated"
+    state.updateNeeded = true
+    poll()
+}
+
+def refresh() {
+    // log.debug "${device.displayName} refresh requested"
+    poll()
+}
+
+def pollDevice() {
+    log.debug "${device.displayName} pollDevice requested"
+    poll()
+}
+
+def secure(hubitat.zwave.Command cmd) {
+	if (state.sec) {
+	    log.debug "Seq secure - $cmd"
+		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
+	} 
+	else {
+	    log.debug "Seq unsecure- $cmd"
+		cmd.format()
+    }
+}
+
+def secureSequence(cmds, delay=1500) {
+    log.debug "SeSeq $cmds"
+    delayBetween(cmds.collect{ secure(it) }, delay)
+}	
+
+// ============================================================================================================================
+//                        Event Generation
+// ============================================================================================================================
+
+def zwaveEvent(hubitat.zwave.commands.thermostatmodev1.ThermostatModeSet cmd) {
+    def CurrentSetPoint=device.currentValue("heatingSetpoint")
+    def CurrentTemperature=device.currentValue("temperature")
+    def CurrentMode=device.currentValue("thermostatMode")
+    def CurrentState=device.currentValue("thermostatOperatingState")
+    def CurrentBattery=device.currentValue("battery")  
+    def modeValue
+    
+    switch (cmd.mode) {
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeSet.MODE_OFF:
+            // log.debug "${device.displayName} up to temp - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery
+            modeValue = "auto"
+            break
+        
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeSet.MODE_AUTO:
+            // log.debug "${device.displayName} set to auto - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery       
+            modeValue = "auto"
+            break
+        
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeSet.MODE_AWAY:
+            // log.debug "${device.displayName} is away - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery       
+            modeValue = "away"
+            break        
+        
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeSet.MODE_HEAT:
+            // log.debug "${device.displayName} called for heat - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery
+            modeValue = "heat"
+    }
+
+    sendEvent(name: "thermostatMode", value: modeValue)
+}
+
+def zwaveEvent(hubitat.zwave.commands.thermostatmodev2.ThermostatModeSet cmd) {
+    def CurrentSetPoint=device.currentValue("heatingSetpoint")
+    def CurrentTemperature=device.currentValue("temperature")
+    def CurrentMode=device.currentValue("thermostatMode")
+    def CurrentState=device.currentValue("thermostatOperatingState")
+    def CurrentBattery=device.currentValue("battery")  
+    def modeValue
+    
+    switch (cmd.mode) {
+        case hubitat.zwave.commands.thermostatmodev2.ThermostatModeSet.MODE_OFF:
+            // log.debug "${device.displayName} up to temp - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery
+            modeValue = "auto"
+            break
+        
+        case hubitat.zwave.commands.thermostatmodev2.ThermostatModeSet.MODE_AUTO:
+            // log.debug "${device.displayName} set to auto - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery       
+            modeValue = "auto"
+            break
+        
+        case hubitat.zwave.commands.thermostatmodev2.ThermostatModeSet.MODE_AWAY:
+            // log.debug "${device.displayName} is away - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery       
+            modeValue = "away"
+            break        
+        
+        case hubitat.zwave.commands.thermostatmodev2.ThermostatModeSet.MODE_HEAT:
+            // log.debug "${device.displayName} called for heat - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery
+            modeValue = "heat"
+    }
+
+    sendEvent(name: "thermostatMode", value: modeValue)
+}
+
+def zwaveEvent(hubitat.zwave.commands.thermostatsetpointv1.ThermostatSetpointReport cmd) { 
+    def map = [:]
+	map.value = cmd.scaledValue.toString()
+	map.unit = cmd.scale == 1 ? "F" : "C"
+	map.displayed = false
+	
+    switch (cmd.setpointType) {
+		case 1:
+			map.name = "heatingSetpoint"
+			break;
+		default:
+			return [:]
+	}
+    
+//    log.debug "${device.displayName} reports that its setpoint is $cmd.scaledValue"
+    state.deviceScale = cmd.scale                 // So we can respond with same format
+    state.scale = cmd.scale
+	state.size = cmd.size    
+    state.precision = cmd.precision
+    
+    if (state.precision == null) { state.precision = 1 } 
+    
+    setHeatingSetpoint(cmd.scaledValue)   
+	createEvent(map)
+}
+
+def zwaveEvent(hubitat.zwave.commands.thermostatmodev2.ThermostatModeSupportedReport cmd) {
+	// log.info "Report Received : Thermostat supported modes"
+}
+
+def zwaveEvent(hubitat.zwave.commands.sensormultilevelv1.SensorMultilevelReport cmd) {
+    mapUnit = cmd.scale == 1 ? "F" : "C"
+    sendEvent(name: "temperature", unit: mapUnit, value: cmd.scaledSensorValue.toString())
+    sendEvent(name: "LastTemp", value: new Date(), displayed: true)   
+    doWeNeedHeat(cmd.scaledSensorValue.toString(), device.currentValue("heatingSetpoint").toDouble())
+}
+
+// Battery powered devices can be configured to periodically wake up and check in. They send this command and stay awake long enough to receive commands, 
+// or until they get a WakeUpNoMoreInformation command that instructs them that there are no more commands to receive and they can stop listening.
+
+def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
+//    doWeNeedHeat(device.currentValue("temperature"), device.currentValue("heatingSetpoint"))
+    
+    def CurrentSetPoint=device.currentValue("heatingSetpoint")
+    def CurrentTemperature=device.currentValue("temperature")
+    def CurrentMode=device.currentValue("thermostatMode")
+    def CurrentState=device.currentValue("thermostatOperatingState")
+    def CurrentBattery=device.currentValue("battery")    
+
+    sendEvent(name: "LastWakeUp", value: new Date(), displayed: true)    
+    log.info "${device.displayName} woke up - Current Temperature is " + CurrentTemperature + " - Setpoint is " + CurrentSetPoint + " - Mode is " + CurrentMode + " - Operating State is " + CurrentState + " - Battery is " + CurrentBattery
+
+	def cmds = []   
+    sendStuff(cmds)
+	cmds << zwave.wakeUpV2.wakeUpNoMoreInformation().format()
+    response(delayBetween(cmds, 2000))   
+}
+
+def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
+    def mapvalue
+    def mapisStateChange
+    def mapdescriptionText
+    
+    if (cmd.batteryLevel == 0xFF) { // Special value for low battery alert
+        mapvalue = 1
+        mapdescriptionText = "${device.displayName} has a low battery"
+        mapisStateChange = true
+    }
+    else {
+        mapvalue = cmd.batteryLevel
+        mapdescriptionText = "${device.displayName} Battery Level is $cmd.batteryLevel" + "%"
+        mapisStateChange = false
+    }
+    
+    state.lastbatt = new Date().time  // Store time of last battery update so we don't ask every wakeup, see WakeUpNotification handler
+    sendEvent(name: "battery", unit: "%", value: mapvalue, isStateChange: mapisStateChange, descriptionText: mapdescriptionText)
+}
+
+def zwaveEvent(hubitat.zwave.commands.thermostatmodev1.ThermostatModeReport cmd) {
+    def modeValue
+    log.debug "${device.displayName} Thermostat Mode V1 Received " + cmd.mode
+    
+    switch (cmd.mode) {
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeReport.MODE_OFF:
+            modeValue = "auto"
+            break
+
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeReport.MODE_HEAT:
+            modeValue = "heat"
+    }
+
+    sendEvent(name: "thermostatMode", value: modeValue)
+}
+
+def zwaveEvent(hubitat.zwave.commands.thermostatmodev2.ThermostatModeReport cmd) {
+    def modeValue
+    log.debug "${device.displayName} Thermostat Mode V2 Received " + cmd.mode
+    
+    switch (cmd.mode) {
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeReport.MODE_OFF:
+            modeValue = "auto"
+            break
+
+        case hubitat.zwave.commands.thermostatmodev1.ThermostatModeReport.MODE_HEAT:
+            modeValue = "heat"
+    }
+
+    sendEvent(name: "thermostatMode", value: modeValue)
+}
+    
+def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalCapabilitiesReport cmd) {
+    state.defaultWakeUpInterval = cmd.defaultWakeUpIntervalSeconds
+    state.maximumWakeUpInterval = cmd.maximumWakeUpIntervalSeconds
+    state.minimumWakeUpInterval = cmd.minimumWakeUpIntervalSeconds
+    state.wakeUpIntervalStep    = cmd.wakeUpIntervalStepSeconds
+}
+
+def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalReport cmd) {
+    sendEvent(name: "DeviceWakeUpSeconds", unit: "seconds", value: cmd.seconds, displayed: true)
+    log.debug "${device.displayName} Wakeup Interval Report Received -> $cmd"
+}
+
+def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
+    log.debug "${device.displayName} Zwave event received: $cmd"
+}
+
+def zwaveEvent(hubitat.zwave.commands.thermostatoperatingstatev1.ThermostatOperatingStateReport cmd) {
+    // log.debug "${device.displayName} Zwave event received: $cmd"
+    
+    switch (cmd.operatingState) {
+        case hubitat.zwave.commands.thermostatoperatingstatev2.ThermostatOperatingStateReport.OPERATING_STATE_HEATING:
+            log.info "${device.displayName} operating state is heating"
+            break
+        
+        case hubitat.zwave.commands.thermostatoperatingstatev2.ThermostatOperatingStateReport.OPERATING_STATE_IDLE:
+            log.info "${device.displayName} operating state is idle"
+            break        
+    }
+}
+
+def zwaveEvent(hubitat.zwave.commands.switchbinaryv1.SwitchBinarySet cmd) {
+/*   log.debug "${device.displayName} Zwave event received: $cmd"
+   
+    if (cmd.switchValue) {
+        log.info "${device.displayName} switched on"
+    } else {
+        log.info "${device.displayName} switched off"
+	}
+*/
+}
+
+def zwaveEvent(hubitat.zwave.Command cmd) {
+    log.warn "${device.displayName} Unexpected zwave command $cmd"
+}
+
+def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
+    def zWaveLibraryTypeDisp  = String.format("%02X",cmd.zWaveLibraryType)
+    def zWaveLibraryTypeDesc  = ""
+    
+    switch(cmd.zWaveLibraryType) {
+        case 1:
+        zWaveLibraryTypeDesc = "Static Controller"
+        break
+
+        case 2:
+        zWaveLibraryTypeDesc = "Controller"
+        break
+
+        case 3:
+        zWaveLibraryTypeDesc = "Enhanced Slave"
+        break
+
+        case 4:
+        zWaveLibraryTypeDesc = "Slave"
+        break
+
+        case 5:
+        zWaveLibraryTypeDesc = "Installer"
+        break
+
+        case 6:
+        zWaveLibraryTypeDesc = "Routing Slave"
+        break
+
+        case 7:
+        zWaveLibraryTypeDesc = "Bridge Controller"
+        break
+
+        case 8:
+        zWaveLibraryTypeDesc = "Device Under Test (DUT)"
+        break
+
+        case 0x0A:
+        zWaveLibraryTypeDesc = "AV Remote"
+        break
+
+        case 0x0B:
+        zWaveLibraryTypeDesc = "AV Device"
+        break
+
+        default:
+        zWaveLibraryTypeDesc = "N/A"
+    }
+
+	def zWaveVersion =  String.format("%d.%02d",cmd.zWaveProtocolVersion,cmd.zWaveProtocolSubVersion)
+    def firmwareLevel = String.format("%d.%02d",cmd.firmware0Version,cmd.firmware0SubVersion)
+	sendEvent([name: "FirmwareLevel", value:  firmwareLevel])            
+	sendEvent([name: "ZWaveVersion", value:  zWaveVersion])
+	sendEvent([name: "ZWaveLibraryType", value:  zWaveLibraryTypeDesc])
+}   
+
+def zwaveEvent(hubitat.zwave.commands.versionv1.VersionCommandClassReport cmd) {
+    log.debug "${device.displayName} ---COMMAND CLASS VERSION REPORT V1--- ${device.displayName} has command class version: ${cmd.commandClassVersion} - payload: ${cmd.payload}"
+}
+
+def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd, Map item1) { 
+	log.debug "${device.displayName} manufacturerId:   ${cmd.manufacturerId}"
+    log.debug "${device.displayName} manufacturerName: ${cmd.manufacturerName}"
+    log.debug "${device.displayName} productId:        ${cmd.productId}"
+    log.debug "${device.displayName} productTypeId:    ${cmd.productTypeId}"
+}
+
+private command(hubitat.zwave.Command cmd) {
+	if (zwaveInfo?.zw?.contains("s")) {
+		response(zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format())
+	} else {
+		response(cmd.format())
+	}
+}
+
+def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
+	def encapsulatedCommand = cmd.encapsulatedCommand(commandClassVersions)
+	state.sec = 1
+	log.debug "${device.displayName} encapsulated: ${encapsulatedCommand}"
+	if (encapsulatedCommand) {
+		zwaveEvent(encapsulatedCommand, results)
+	} else {
+		log.warn "${device.displayName} Unable to extract encapsulated cmd from $cmd"
+		results << createEvent(descriptionText: cmd.toString())
+	}
+}
+
+// ============================================================================================================================
+//                         Command Implementations
+// ============================================================================================================================
+
+def configure() {
+    def cmds = []
+    def userWake = getUserWakeUp(userWakeUpInterval)
+    log.debug "${device.displayName} Sending Configuration"
+    
+    if (!state.deviceScale)         state.deviceScale = 1                   // Set defaults
+    if (!state.precision)           state.precision = 1          
+    if (!state.scale)               state.scale = 0 
+    if (!state.size)                state.size = 2 
+    if (!state.convertedDegrees)    state.convertedDegrees = 64.4           // Set default 18C = 64.4F    
+    if (state.precision == null) { state.precision = 1 } 
+    
+    // After initial inclusion the following will be Null - therefore set temperatures to the device default of 18C and mode/state to auto
+    
+    sendEvent(name: "temperature", value: "18")        
+    sendEvent(name: "heatingSetpoint", value: "18")    
+    sendEvent(name: "thermostatSetpoint", value: "18")        
+    sendEvent(name: "thermostatMode", value: "auto")
+    sendEvent(name: "thermostatOperatingState", value: "auto")
+    
+   	if (!device.currentState('batteryLastReplaced')?.value)
+		resetBatteryReplacedDate(true)
+
+	cmds << zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format()	                   // Set hub to get mode set commands 
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get binary switch set commands
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:3, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get battery reports / warnings
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:4, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get set point reports
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
+	cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
+    cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)
+	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x05], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+    cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds    
+    delayBetween(cmds, 1500)
+}
+
+def resetBatteryReplacedDate(paired) {
+	def newlyPaired = paired ? " for newly paired device" : ""
+	sendEvent(name: "batteryLastReplaced", value: new Date())
+    sendEvent(name: "battery", value: "100")
+	log.debug "${device.displayName} Setting Battery Last Replaced to Current date${newlyPaired} and level to 100%"
+}
+
+def poll() {
+    def cmds = []
+//    log.debug "${device.displayName} Now Polling"   
+    cmds << zwave.sensorMultilevelV1.sensorMultilevelGet().format()                     // current temperature
+    cmds << zwave.thermostatModeV1.thermostatModeGet().format()
+    cmds <<	zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: 1).format()
+    cmds << zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
+    delayBetween(cmds, 1500)
+}
+
+def quickSetHeat(degrees) {
+    setHeatingSetpoint(degrees)
+    log.debug("${device.displayName} Degrees at quicksetheat: $degrees")
+    poll()
+}
+
+def setTempUp() {
+    def newtemp = device.currentValue("heatingSetpoint").toInteger() + 1
+    log.debug "${device.displayName} Setting temp up: $newtemp"
+    quickSetHeat(newtemp)
+    poll()
+}
+
+def setTempDown() {
+    def newtemp = device.currentValue("heatingSetpoint").toInteger() - 1
+    log.debug "${device.displayName} Setting temp down: $newtemp"
+    quickSetHeat(newtemp)
+    poll()
+}
+
+def setTemperature(temp) {
+    log.debug "${device.displayName} setTemperature $temp"
+    quickSetHeat(temp)
+    poll()
+}
+
+def heat() { 
+    sendEvent(name: "thermostatMode", value: "heat", displayed: true)
+    poll()
+}
+
+def cool() { 
+    auto()
+}
+
+def auto(){ 
+    sendEvent(name: "thermostatMode", value: "auto", displayed: true)
+    degrees=device.currentValue("heatingSetpoint")
+    CurrentTemperature=device.currentValue("temperature")             
+    poll()
+}
+
+def off() {
+    froston()
+}
+
+def on(){
+    frostoff()
+}
+
+def froston(){ 
+    auto()
+}
+
+def frostoff(){
+    auto()
+}
+
+def ping() {
+    poll()
+}
+
+def setThermostatFanMode() {
+    // Not used in this driver
+}
+
+def fanOn() {
+    // Not used in this driver
+}
+
+def fanAuto() {
+    // Not used in this driver
+}
+
+def fanCirculate() {
+    // Not used in this driver
+}
+
+def setCoolingSetpoint(value) {
+    // Not used in this driver
+}
+
+def setSchedule(value) {
+    // Not used in this driver
+}
+
+private setHeatingSetpoint(degrees) {
+    setHeatingSetpoint(degrees.toDouble())
+}
+
+private setHeatingSetpoint(Double degrees) {
+    sendEvent(name: 'heatingSetpoint', value: degrees)
+    sendEvent(name: "thermostatSetpoint", value: degrees)
+
+    def deviceScale = state.scale ?: 1
+    def deviceScaleString = deviceScale == 2 ? "C" : "F"
+    def locationScale = getTemperatureScale()
+    def convertedDegrees
+
+    if (state.precision == null) { state.precision = 1 } 
+    
+//    log.debug "LocationScale = $locationScale - deviceScaleString = $deviceScaleString - degrees = $degrees"
+
+    if (locationScale == "C" && deviceScaleString == "F") {
+        convertedDegrees = celsiusToFahrenheit(degrees)
+    } 
+    else if (locationScale == "F" && deviceScaleString == "C") {
+        convertedDegrees = fahrenheitToCelsius(degrees)
+    } 
+    else {
+        convertedDegrees = degrees
+    }
+    
+    state.deviceScale = deviceScale
+    state.convertedDegrees = convertedDegrees
+
+    CurrentTemperature=device.currentValue("temperature")             
+    doWeNeedHeat(CurrentTemperature, degrees)
+}
+    
+private doWeNeedHeat(CurrentTemperature, double CurrentSetPoint) {       // Compare new SetPoint values with temperature and change mode if necessary
+    iCurrentSetPoint=CurrentSetPoint.toBigDecimal()
+    iCurrentTemperature=CurrentTemperature.toBigDecimal()
+    degrees=CurrentSetPoint.toString()
+
+    if (CurrentTemperature) {                                            // Don't execute the following if the Current Temperature is not yet set
+        if (iCurrentSetPoint >= iCurrentTemperature) {
+            log.info "${device.displayName} Current SetPoint is ${degrees} Current Temperature is ${CurrentTemperature} - Calling for Heat"                                            
+//            setThermostatMode("heat")                                      // Need to call for Heat
+            sendEvent(name: 'thermostatOperatingState', value: "heating")  // Now set Thermostat Operating State
+        } else {
+            log.info "${device.displayName} Current SetPoint is ${degrees} Current Temperature is ${CurrentTemperature} - Heat not needed"                                             
+//            setThermostatMode("auto")                                      // Need to turn mode off    
+            sendEvent(name: 'thermostatOperatingState', value: "idle")     // Now set Thermostat Operating State  
+        }
+    } else {
+         log.debug "Current Temperature is not set yet - don't know if heat is required or not"
+    }
+}
+
+private getUserWakeUp(userWake) {
+    if (!userWake) {userWake = '900'}                               // set default 15 mins if no user preference   
+    if (userWake.toInteger() < 256) {userWake = '300'}              // 5 minutes - Mininum
+    if (userWake.toInteger() > 36000) {userWake = '86400'}          // 24 hours  - Maximum
+    return userWake.toInteger()
+}
+
+private sendStuff(cmds) {
+    def userWake = getUserWakeUp(userWakeUpInterval)
+    def CurrentSetPoint=device.currentValue("heatingSetpoint")
+    state.checkInterval = userWake
+//    log.debug "Updating setpoint to -> $state.deviceScale - $state.precision - $state.convertedDegrees"
+	
+    cmds << zwave.thermostatSetpointV1.thermostatSetpointSet(setpointType: hubitat.zwave.commands.thermostatsetpointv1.ThermostatSetpointSet.SETPOINT_TYPE_HEATING_1, scale: state.deviceScale, precision: state.precision, scaledValue: state.convertedDegrees).format()                                      
+	cmds << zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format()	                   // Set hub to get mode set commands 
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get binary switch set commands
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:3, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get battery reports / warnings
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:4, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get set point reports
+    cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
+	cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
+    cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)
+	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x05], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+    cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds    
+    cmds << zwave.sensorMultilevelV1.sensorMultilevelGet().format()                     // current temperature
+	cmds << zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: hubitat.zwave.commands.thermostatsetpointv1.ThermostatSetpointGet.SETPOINT_TYPE_HEATING_1).format()
+	cmds << zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
+    cmds << zwave.thermostatModeV1.thermostatModeSupportedGet().format()
+    cmds << zwave.wakeUpV2.wakeUpIntervalGet().format()    
+    cmds << zwave.wakeUpV2.wakeUpIntervalCapabilitiesGet().format()                    // No need to always get this - SRT-321 and IQE RT-321 = 256 seconds min, 131,071 seconds max (36.4 Hours), 86,400 seconds default (24 Hours)   
+                                                                                       //                              Horstmann HRT4-ZW     = 131,071 seconds default (36.4 Hours)    
+    
+    if (!state.lastbatt || (new Date().time) - state.lastbatt > 24*60*60*1000) { // Only ask for battery if we haven't had a BatteryReport in a while
+//    	log.debug "Battery state needed at next wakeup"
+    	cmds << zwave.batteryV1.batteryGet().format()  
+    } else {
+        if (device.currentValue("battery")=="1") {
+    	    log.debug "Getting battery state as too low to operate - and batteries may have been changed"
+    	    cmds << zwave.batteryV1.batteryGet().format()  
+        }
+    }
+}
+
+private setThermostatMode(mode){
+    switch (mode) {
+        case on:
+            on()
+            break
+        case heat:
+            heat()
+            break
+        case auto:
+            off()
+            break
+        case 1:
+            heat()
+            break
+        case off:
+            off()
+            break
+        case cool:
+            off()
+            break
+    }
+}
