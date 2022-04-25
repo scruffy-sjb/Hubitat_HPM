@@ -1,0 +1,16 @@
+{
+  "packageName": "Secure/IQE/Horstmann SRT321/RT321/HRT4-ZW Room Thermostat Driver",
+  "author": "Simon Burke",
+  "version": "2.4",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2022-04-17",
+  "drivers": [
+    {
+      "id": "8ed77d81-4050-4525-bfcc-83bc503b5e7f",
+      "name": "Secure SRT321 Thermostat",
+      "namespace": "scruffy-sjb",
+      "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/Secure/SRT321",
+      "required": true
+    }
+  ]
+}
