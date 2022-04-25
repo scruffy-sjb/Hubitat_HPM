@@ -73,8 +73,9 @@ def installed() {
 }
 
 def updated() {
-    log.debug "${device.displayName} preferences updated"
-    state.updateNeeded = true
+    log.info "${device.displayName} preferences updated"
+    def userWake = getUserWakeUp(userWakeUpInterval)
+    state.checkInterval = userWake
     poll()
 }
 
@@ -291,7 +292,7 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalCapabilitiesReport 
 
 def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalReport cmd) {
     sendEvent(name: "DeviceWakeUpSeconds", unit: "seconds", value: cmd.seconds, displayed: true)
-    log.debug "${device.displayName} Wakeup Interval Report Received -> $cmd"
+//    log.debug "${device.displayName} Wakeup Interval Report Received -> $cmd"
 }
 
 def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
@@ -303,11 +304,11 @@ def zwaveEvent(hubitat.zwave.commands.thermostatoperatingstatev1.ThermostatOpera
     
     switch (cmd.operatingState) {
         case hubitat.zwave.commands.thermostatoperatingstatev2.ThermostatOperatingStateReport.OPERATING_STATE_HEATING:
-            log.info "${device.displayName} operating state is heating"
+//            log.debug "${device.displayName} operating state is heating"
             break
         
         case hubitat.zwave.commands.thermostatoperatingstatev2.ThermostatOperatingStateReport.OPERATING_STATE_IDLE:
-            log.info "${device.displayName} operating state is idle"
+//            log.debug "${device.displayName} operating state is idle"
             break        
     }
 }
@@ -448,7 +449,7 @@ def configure() {
     cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
 	cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
     cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)
-	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x05], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x10], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
     cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds    
     delayBetween(cmds, 1500)
 }
@@ -631,7 +632,7 @@ private sendStuff(cmds) {
     cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
 	cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
     cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)
-	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x05], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x10], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
     cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds    
     cmds << zwave.sensorMultilevelV1.sensorMultilevelGet().format()                     // current temperature
 	cmds << zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: hubitat.zwave.commands.thermostatsetpointv1.ThermostatSetpointGet.SETPOINT_TYPE_HEATING_1).format()
