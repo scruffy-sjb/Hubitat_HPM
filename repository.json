@@ -70,10 +70,11 @@
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/scruffy-sjb/Hubitat_HPM/main/repository.json",
       "description":  "Secure IQE Horstmann SRT321 RT321 HRT4-ZW Room Thermostat Driver",
-	   "tags": [
+      "tags": [
         "ZWave",
         "Climate Control",
         "Temperature & Humidity"
+       ]
     }
   ]
 }
