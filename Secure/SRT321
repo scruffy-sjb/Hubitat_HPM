@@ -4,8 +4,11 @@ SRT321 Thermostat by Scruffy-SJB
     Version 2.1  November 20 2020 - Added Z-Wave Plus Fingerprint
             2.2  December 31 2020 - Minor cosmetic tweaks, less debug statements into logs 
                                                          - Minimum wakeup interval enforced
-            2.3  January 7 2021 - Fixed bug with some versions of SRT321 not getting their configuration after I added the Z-Wave+ bits
-            2.4  April 17 2022 - Added LastTemp and LastCheckin Status, various other minor improvements
+            2.3  January 7 2021   - Fixed bug with some versions of SRT321 not getting their configuration after I added the Z-Wave+ bits
+            2.4  April 17 2022    - Added LastTemp and Checkin Status, various other minor improvements
+            2.5  May 8 2022       - Configuration sending changes 
+            2.6  Sept 18 2022     - Added ability to set temperature reporting delta and added extra configuration reporting
+            2.7  December 14 2022 - Reduced duplicate log messages
 */
 
 metadata {
@@ -33,6 +36,9 @@ metadata {
     attribute "LastWakeUp", "string"
     attribute "LastTemp", "string"
     attribute "DeviceWakeUpSeconds", "string"
+    attribute "tempEvery", "string"
+    attribute "tempScale", "string"
+    attribute "tempSensor", "string"
         
     fingerprint mfr:"0059", prod:"0001", deviceId:"0003", inClusters:"0x72,0x86,0x80,0x84,0x31,0x43,0x85,0x70", outClusters:"0x40,0x25", deviceJoinName: "Secure SRT321 Z-Wave Thermostat" 
     fingerprint mfr:"0059", prod:"0001", deviceId:"0005", inClusters:"0x5E,0x72,0x86,0x80,0x84,0x31,0x43,0x85,0x70,0x5A,0x73,0x59,0x42,0x40,0x20", outClusters:"0x40,0x25", deviceJoinName: "Secure SRT321 Z-Wave+ Thermostat" 
@@ -41,8 +47,21 @@ metadata {
 	main "heatingSetpoint"
         details(["heatingSetpoint", "battery", "refresh", "configure", "temperature", "mode"])
 
+    //Thresholds for  Temp report
+def tempReportRates = [:]  //  0x01 – 0x32 report if temperature changed by delta = 0,1°C … 5,0 °C default 0x0A)
+    tempReportRates << ["1" : "Report 0.1 degree temperature change"] // 0x01
+    tempReportRates << ["2" : "Report 0.2 degree temperature change"] // 0x02
+    tempReportRates << ["5" : "Report 0.5 degree temperature change"] // 0x05
+    tempReportRates << ["8" : "Report 0.8 degree temperature change"] // 0x08
+    tempReportRates << ["10" : "Report 1.0 degree temperature change"] // 0x0A
+    tempReportRates << ["15" : "Report 1.5 degree temperature change"] // 0x0F
+    tempReportRates << ["20" : "Report 2.0 degree temperature change"] // 0x14
+    tempReportRates << ["30" : "Report 3.0 degree temperature change"] // 0x1E
+    tempReportRates << ["50" : "Report 5.0 degree temperature change"] // 0x32
+    
 preferences {
     input "userWakeUpInterval", "number", title: "Wakeup interval...", description: "Wake Up Interval (seconds)", defaultValue: 900, required: false, displayDuringSetup: false
+    input "tempReport", "enum", title: "Temperature report threshold", options: tempReportRates, description: "Default: 1.0 degrees", defaultValue: 10, required: false, displayDuringSetup: false
     }
 }
 
@@ -76,6 +95,7 @@ def updated() {
     log.info "${device.displayName} preferences updated"
     def userWake = getUserWakeUp(userWakeUpInterval)
     state.checkInterval = userWake
+    state.configNeeded=1   
     poll()
 }
 
@@ -205,6 +225,7 @@ def zwaveEvent(hubitat.zwave.commands.thermostatmodev2.ThermostatModeSupportedRe
 
 def zwaveEvent(hubitat.zwave.commands.sensormultilevelv1.SensorMultilevelReport cmd) {
     mapUnit = cmd.scale == 1 ? "F" : "C"
+    log.info "Report Received : Sensor MultiLevel Report"
     sendEvent(name: "temperature", unit: mapUnit, value: cmd.scaledSensorValue.toString())
     sendEvent(name: "LastTemp", value: new Date(), displayed: true)   
     doWeNeedHeat(cmd.scaledSensorValue.toString(), device.currentValue("heatingSetpoint").toDouble())
@@ -227,8 +248,9 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
 
 	def cmds = []   
     sendStuff(cmds)
+//    cmds << zwave.sensorMultilevelV1.sensorMultilevelGet().format()                     // current temperature
 	cmds << zwave.wakeUpV2.wakeUpNoMoreInformation().format()
-    response(delayBetween(cmds, 2000))   
+    response(delayBetween(cmds, 1500))   
 }
 
 def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
@@ -282,7 +304,48 @@ def zwaveEvent(hubitat.zwave.commands.thermostatmodev2.ThermostatModeReport cmd)
 
     sendEvent(name: "thermostatMode", value: modeValue)
 }
-    
+  
+def zwaveEvent(hubitat.zwave.commands.configurationv2.ConfigurationReport cmd ) {
+    log.info "Configuration Report Received : $cmd"
+
+    switch (cmd.parameterNumber) {
+
+        case 1:
+            if (cmd.scaledConfigurationValue == -1) {
+                log.info "Configuration Report: Temperature sensor is on"
+                sendEvent(name: "tempSensor", value: "On")
+            } else {
+                log.info "Configuration Report: Temperature sensor is off"              
+                sendEvent(name: "tempSensor", value: "Off")                
+            }   
+            break
+
+        case 2:
+            if (cmd.scaledConfigurationValue == 0) {
+                log.info "Configuration Report: Temperature is reported in degrees celsius" 
+                sendEvent(name: "tempScale", value: "C")                
+            } else {
+                log.info "Configuration Report: Temperature is reported in degrees F"                 
+                sendEvent(name: "tempScale", value: "F")                
+            }   
+            break
+
+        case 3:
+            def setValue
+            def setValueDec
+
+            if (cmd.scaledConfigurationValue == 0) {
+                setValue = "Disabled"
+            } else {
+                setValueDec =  (cmd.scaledConfigurationValue/10)
+                setValue = "Report ${setValueDec} degree temperature change"
+            }
+            log.info "Configuration Report: Temperature ${setValue}"
+            sendEvent(name: "tempEvery", value: setValue)        
+            break
+    }
+}
+
 def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalCapabilitiesReport cmd) {
     state.defaultWakeUpInterval = cmd.defaultWakeUpIntervalSeconds
     state.maximumWakeUpInterval = cmd.maximumWakeUpIntervalSeconds
@@ -326,6 +389,14 @@ def zwaveEvent(hubitat.zwave.commands.switchbinaryv1.SwitchBinarySet cmd) {
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
     log.warn "${device.displayName} Unexpected zwave command $cmd"
+    
+    delayBetween([
+		zwave.sensorMultilevelV1.sensorMultilevelGet().format(), // current temperature
+		zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: 1).format(),
+		zwave.thermostatModeV1.thermostatModeGet().format(),
+		zwave.thermostatFanModeV3.thermostatFanModeGet().format(),
+		zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
+	], 1000)
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -422,6 +493,7 @@ def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cm
 def configure() {
     def cmds = []
     def userWake = getUserWakeUp(userWakeUpInterval)
+    state.configNeeded=1    
     log.debug "${device.displayName} Sending Configuration"
     
     if (!state.deviceScale)         state.deviceScale = 1                   // Set defaults
@@ -449,7 +521,8 @@ def configure() {
     cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
 	cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
     cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)
-	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x10], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+                                                                                                                           // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+    cmds << zwave.configurationV1.configurationSet(configurationValue:  tempReport == "1" ? [0x01] : tempReport == "2" ? [0x02] : tempReport == "5" ? [0x05] : tempReport == "8" ? [0x08] : tempReport == "10" ? [0x0A] : tempReport == "15" ? [0x0F] : tempReport == "20" ? [0x14] : tempReport == "30" ? [0x1E] : tempReport == "50" ? [0x32] : [0x00], parameterNumber:3, size:1).format() 
     cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds    
     delayBetween(cmds, 1500)
 }
@@ -624,26 +697,32 @@ private sendStuff(cmds) {
     state.checkInterval = userWake
 //    log.debug "Updating setpoint to -> $state.deviceScale - $state.precision - $state.convertedDegrees"
 	
+   if (state.configNeeded == 1) {
+        cmds << zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format()	                   // Set hub to get mode set commands 
+        cmds << zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get binary switch set commands
+        cmds << zwave.associationV1.associationSet(groupingIdentifier:3, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get battery reports / warnings
+        cmds << zwave.associationV1.associationSet(groupingIdentifier:4, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get set point reports
+        cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
+	    cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
+        cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)                                                                                                                           // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
+        cmds << zwave.configurationV1.configurationSet(configurationValue:  tempReport == "1" ? [0x01] : tempReport == "2" ? [0x02] : tempReport == "5" ? [0x05] : tempReport == "8" ? [0x08] : tempReport == "10" ? [0x0A] : tempReport == "15" ? [0x0F] : tempReport == "20" ? [0x14] : tempReport == "30" ? [0x1E] : tempReport == "50" ? [0x32] : [0x00], parameterNumber:3, size:1).format()     
+        cmds << zwave.configurationV1.configurationGet(parameterNumber: 1).format()
+        cmds << zwave.configurationV1.configurationGet(parameterNumber: 2).format()
+        cmds << zwave.configurationV1.configurationGet(parameterNumber: 3).format()
+        state.configNeeded = 0
+   }
+    
+    cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds  
+    cmds << zwave.wakeUpV2.wakeUpIntervalGet().format()    
+    cmds << zwave.wakeUpV2.wakeUpIntervalCapabilitiesGet().format()                    // No need to always get this - SRT-321 and IQE RT-321 = 256 seconds min, 131,071 seconds max (36.4 Hours), 86,400 seconds default (24 Hours)   
+                                                                                       //                              Horstmann HRT4-ZW     = 131,071 seconds default (36.4 Hours)    
     cmds << zwave.thermostatSetpointV1.thermostatSetpointSet(setpointType: hubitat.zwave.commands.thermostatsetpointv1.ThermostatSetpointSet.SETPOINT_TYPE_HEATING_1, scale: state.deviceScale, precision: state.precision, scaledValue: state.convertedDegrees).format()                                      
-	cmds << zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format()	                   // Set hub to get mode set commands 
-    cmds << zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get binary switch set commands
-    cmds << zwave.associationV1.associationSet(groupingIdentifier:3, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get battery reports / warnings
-    cmds << zwave.associationV1.associationSet(groupingIdentifier:4, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get set point reports
-    cmds << zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format()                     // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
-	cmds << zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()       // set the temperature sensor On
-    cmds << zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 2, size: 1).format()       // set to celsius   ([0x7F] = Degrees F)
-	cmds << zwave.configurationV1.configurationSet(configurationValue: [0x10], parameterNumber: 3, size: 1).format()       // set the temp difference to cause a report (1 to 100 - default is 10 = 1 degree)    
-    cmds << zwave.wakeUpV2.wakeUpIntervalSet(seconds:userWake, nodeid:zwaveHubNodeId).format()                             // set the wakeup seconds    
     cmds << zwave.sensorMultilevelV1.sensorMultilevelGet().format()                     // current temperature
 	cmds << zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: hubitat.zwave.commands.thermostatsetpointv1.ThermostatSetpointGet.SETPOINT_TYPE_HEATING_1).format()
 	cmds << zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
     cmds << zwave.thermostatModeV1.thermostatModeSupportedGet().format()
-    cmds << zwave.wakeUpV2.wakeUpIntervalGet().format()    
-    cmds << zwave.wakeUpV2.wakeUpIntervalCapabilitiesGet().format()                    // No need to always get this - SRT-321 and IQE RT-321 = 256 seconds min, 131,071 seconds max (36.4 Hours), 86,400 seconds default (24 Hours)   
-                                                                                       //                              Horstmann HRT4-ZW     = 131,071 seconds default (36.4 Hours)    
-    
+       
     if (!state.lastbatt || (new Date().time) - state.lastbatt > 24*60*60*1000) { // Only ask for battery if we haven't had a BatteryReport in a while
-//    	log.debug "Battery state needed at next wakeup"
     	cmds << zwave.batteryV1.batteryGet().format()  
     } else {
         if (device.currentValue("battery")=="1") {
