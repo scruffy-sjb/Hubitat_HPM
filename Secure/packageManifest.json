@@ -1,9 +1,9 @@
 {
   "packageName": "Secure SRT321 Thermostat",
   "author": "Simon Burke",
-  "version": "2.4",
+  "version": "2.7",
   "minimumHEVersion": "2.1.9",
-  "dateReleased": "2022-04-17",
+  "dateReleased": "2022-02-08",
   "drivers": [
     {
       "id": "8ed77d81-4050-4525-bfcc-83bc503b5e7f",
