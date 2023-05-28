@@ -17,7 +17,7 @@
  *  Version History
  *
  *  2021-09-19: Version 1.0 Initial release
- *  2023-05-28: Version 1.1 - added automatic refresh after a command is sent and set preferences after configure is called
+ *  2023-05-28: Version 1.2 - added automatic refresh after a command is sent and set preferences after configure is called
  *
 */
 
@@ -344,7 +344,6 @@ def updated() {
         state.updatedLastRanAt = new Date().time
         unschedule(refresh)
         unschedule(poll)
-        runIn (01, configure)
         sendEvent(name: "refreshRate", value: refreshRate)
 		
 		switch(refreshRate) {
