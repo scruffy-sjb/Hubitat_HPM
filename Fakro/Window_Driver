@@ -17,7 +17,7 @@
  *  Version History
  *
  *  2021-09-19: Version 1.0 Initial release
- *  2023-05-28: Version 1.3 - added automatic refresh after a command is sent and set preferences after configure is called
+ *  2023-05-28: Version 1.5 - added automatic refresh after a command is sent and set preferences after configure is called
  *
 */
 
@@ -134,7 +134,7 @@ def parse(String description) {
 }
 
 def zwaveEvent(hubitat.zwave.commands.switchmultilevelv3.SwitchMultilevelReport cmd){
-    log.info "Report Received : Window open ${cmd.value}%"
+//    log.info "Report Received : Window open ${cmd.value}%"
     sendEvent(name: "lastCheckin", value: new Date())
 	windowEvents(cmd)
 }
@@ -151,17 +151,15 @@ private void windowEvents(hubitat.zwave.Command cmd) {
    if (position > 0)  {
       sendEvent(name: "windowOpen", value: "yes")
       switchValue = "on" 
-      log.info "$device.displayName window is open"       
+      log.info "$device.displayName window is open - switch is $switchValue - position is $position"       
    } else {
       sendEvent(name: "windowOpen", value: "no")
       switchValue = "off"  
-      log.info "$device.displayName window is closed"       
+      log.info "$device.displayName window is closed - switch is $switchValue - position is $position"       
    }
     
     sendEvent(name: "position", value: position, unit: "%")  
     sendEvent(name: "switch", value: switchValue)
-    log.info "$device.displayName position is $position"
-    log.info "$device.displayName switch is $switchValue"
 }
 
 def zwaveEvent(hubitat.zwave.commands.associationv2.AssociationReport cmd) {
@@ -381,8 +379,8 @@ def ping() {
 def refresh() {
     def cmds = []
     log.trace "refresh"
-    cmds <<	zwave.basicV1.basicGet()						// get mode (basic)	
-    cmds <<	zwave.sensorMultilevelV1.sensorMultilevelGet()	// get temp
+//    cmds <<	zwave.basicV1.basicGet()						// get mode (basic)	
+//    cmds <<	zwave.sensorMultilevelV1.sensorMultilevelGet()	// get temp
     cmds << zwave.switchMultilevelV3.switchMultilevelGet()	// position
     secureSequence (cmds)
 }
@@ -486,7 +484,7 @@ private processParam15(cmd) {
 }
 
 def poll() { 
-    log.info "Polling...."
+    log.info "$device.displayName Polling...."
 
     def cmds = []
     cmds <<	zwave.basicV1.basicGet()						// get basic	
@@ -501,7 +499,7 @@ void debugOff() {
 
 void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionGet cmd) {
     hubitat.zwave.Command encapCmd = cmd.encapsulatedCommand(commandClassVersions)
-    log.debug "Supervision cmd received"
+    log.debug "$device.displayName Supervision cmd received"
     if (encapCmd) {
         zwaveEvent(encapCmd)
     }
@@ -564,35 +562,35 @@ void zwaveEvent(hubitat.zwave.commands.switchmultilevelv2.SwitchMultilevelStopLe
 }
 
 def on() {
-	log.trace("on")
+//	log.trace("on")
     open()
 }
 
 def off() {
-	log.trace("off")
+//	log.trace("off")
     close()
 }
 
 def open() {
-	log.trace("Open")
+	log.info("$device.displayName Opening")
 	state.switchState = "open"
 	setLevel(255)    
 }
 
 def close() {
-	log.trace("Close")
+	log.info("$device.displayName Closing")
 	state.switchState = "closed"
 	setLevel(0)  
 }
 
 def setPosition(level) {
-    log.trace("Changing Position")
+    log.info("$device.displayName Changing Position")
     int newLevel=2.55*level
     setLevel(newLevel)
 }
 
 def setLevel(level) {
-	log.trace "setPosition value:${level}"
+//	log.trace "setPosition value:${level}"
     def cmds = []
 	cmds << zwave.basicV1.basicSet(value: level) 
     cmds <<	zwave.switchMultilevelV3.switchMultilevelGet()    
