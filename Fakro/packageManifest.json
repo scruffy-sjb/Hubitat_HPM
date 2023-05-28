@@ -1,9 +1,9 @@
 {
   "packageName": "Fakro Window Driver",
   "author": "Scruffy-SJB",
-  "version": "1.0",
+  "version": "1.1",
   "minimumHEVersion": "2.1.9",
-  "dateReleased": "2021-09-19",
+  "dateReleased": "2023-05-28",
   "drivers": [
     {
       "id": "37963257-461a-4a20-8b8d-833f7529a945",
