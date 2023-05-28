@@ -17,6 +17,7 @@
  *  Version History
  *
  *  2021-09-19: Version 1.0 Initial release
+ *  2023-05-28: Version 1.1 - added automatic refresh after a command is sent and set preferences after configure is called
  *
 */
 
@@ -335,6 +336,7 @@ def configure() {
     sendEvent(name: "configuration", value: "sent", displayed: true)
     log.info "Configuration sent"
     secureSequence(cmds)    
+    updated()
 }
 
 def updated() {
@@ -596,6 +598,7 @@ def setLevel(level) {
 	cmds << zwave.basicV1.basicSet(value: level) 
     cmds <<	zwave.switchMultilevelV3.switchMultilevelGet()    
     secureSequence (cmds)
+    runIn1Minute(poll)
 }
 
 String startPositionChange(direction){
