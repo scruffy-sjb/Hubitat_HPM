@@ -17,7 +17,7 @@
  *  Version History
  *
  *  2021-09-19: Version 1.0 Initial release
- *  2023-05-28: Version 1.5 - added automatic refresh after a command is sent and set preferences after configure is called
+ *  2023-05-28: Version 1.6 - added automatic refresh after a command is sent and set preferences after configure is called
  *
 */
 
@@ -378,8 +378,8 @@ def ping() {
 //Refresh
 def refresh() {
     def cmds = []
-    log.trace "refresh"
-//    cmds <<	zwave.basicV1.basicGet()						// get mode (basic)	
+    log.trace "$device.displayName Refresh called"
+    cmds <<	zwave.basicV1.basicGet()						// get mode (basic)	
 //    cmds <<	zwave.sensorMultilevelV1.sensorMultilevelGet()	// get temp
     cmds << zwave.switchMultilevelV3.switchMultilevelGet()	// position
     secureSequence (cmds)
@@ -485,7 +485,6 @@ private processParam15(cmd) {
 
 def poll() { 
     log.info "$device.displayName Polling...."
-
     def cmds = []
     cmds <<	zwave.basicV1.basicGet()						// get basic	
     cmds << zwave.switchMultilevelV3.switchMultilevelGet()	// position
@@ -573,29 +572,27 @@ def off() {
 
 def open() {
 	log.info("$device.displayName Opening")
-	state.switchState = "open"
 	setLevel(255)    
 }
 
 def close() {
 	log.info("$device.displayName Closing")
-	state.switchState = "closed"
 	setLevel(0)  
 }
 
 def setPosition(level) {
-    log.info("$device.displayName Changing Position")
     int newLevel=2.55*level
+    log.info("$device.displayName Changing Position to $newLevel")
     setLevel(newLevel)
 }
 
 def setLevel(level) {
-//	log.trace "setPosition value:${level}"
+	log.info "$device.displayName Setting Position to value:${level}"
     def cmds = []
 	cmds << zwave.basicV1.basicSet(value: level) 
     cmds <<	zwave.switchMultilevelV3.switchMultilevelGet()    
     secureSequence (cmds)
-    runIn(60, "poll")
+//    runIn(60, "poll")
 }
 
 String startPositionChange(direction){
