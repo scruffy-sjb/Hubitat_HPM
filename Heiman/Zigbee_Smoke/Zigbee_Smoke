@@ -16,6 +16,7 @@
  *   Code snippets copied from veeceeoh, Daniel Terryn and Marcus Liljergren - with thanks.
  */
 
+// Ver: 2.4 - Fixed issue with calculation of battery percentage for devices that only provide raw voltage
 // Ver: 2.3 - Added fingerprints for Tuya TS0205 Smoke Alarms
 // Ver: 2.2 - Added debug for IAS Zone Status and ability to cater for devices with different battery voltages
 // Ver: 2.1 - Removed CO Sensors and created a new driver just for them. 
@@ -62,9 +63,6 @@ metadata {
 def SensorTestOptions = [:]
 	SensorTestOptions << ["1" : "Yes"] // 0x01
 	SensorTestOptions << ["0" : "No"]  // 0x00
-
-def BatteryMaxVolts = 3
-def BatteryMinVolts = 2.5
 
 preferences {
 	input "SensorTest", "enum", title: "Enable Sensor Testing", options: SensorTestOptions, description: "Default: Yes", required: false, displayDuringSetup: true
@@ -122,8 +120,8 @@ def parse(String description) {
                 def batteryVoltage = ConvertHexValue(descMap.value)    
                 
                 if (batteryVoltage > 0) {                                            // Supress zero battery voltage reports (sent by Tuya)
-                    def batteryVolts = batteryVoltage/10
-				    log.debug "${device.displayName} Raw Battery Voltage returned is ${batteryVolts}"
+                    BigDecimal batteryVolts = batteryVoltage/10
+				    log.info "${device.displayName} Battery Voltage is ${batteryVolts}"
                     handleBatteryEvent(batteryVoltage)
                 }
             }else if ((descMap?.cluster == "0001" && descMap.attrInt == 0x0051)) {  //Battery Cells
@@ -200,12 +198,13 @@ def refresh() {
 }
 
 def configure() {
-    log.debug "${device.displayName} Configuring..."
+    log.debug "${device.displayName} Configuring..."  
     
 	if (!device.currentState('batteryLastReplaced')?.value)
 		resetBatteryReplacedDate(true)
     
 	if (!BatteryMaxVolts) BatteryMaxVolts = 3
+	if (!BatteryMinVolts) BatteryMinVolts = 2.5    
 	
     def cmds = [
         // Bindings
@@ -248,11 +247,12 @@ def resetToClear() {
 private handleBatteryEvent(rawVolts) {
     if (rawVolts > 0) {
         rawVolts = rawVolts / 10.0
-	    def minVolts = voltsmin ? voltsmin : BatteryMinVolts
-	    def maxVolts = voltsmax ? voltsmax : BatteryMaxVolts
-	    def pct = (rawVolts - minVolts) / (maxVolts - minVolts)
-	    def roundedPct = Math.min(100, Math.round(pct * 100))
-	    log.debug "${device.displayName} Battery level is ${roundedPct}% (${rawVolts} Volts)"
+	    
+        if (!BatteryMaxVolts) BatteryMaxVolts = 3
+	    if (!BatteryMinVolts) BatteryMinVolts = 2.5         
+        
+	    BigDecimal roundedPct = Math.min(100, Math.round((rawVolts - BatteryMinVolts.toBigDecimal()) / (BatteryMaxVolts.toBigDecimal() - BatteryMinVolts.toBigDecimal()) * 100))
+	    log.info "${device.displayName} Battery level is ${roundedPct}% (${rawVolts} Volts)"
 	
         sendEvent(name:"battery", value: roundedPct, unit: "%", isStateChange: true)
     }
