@@ -16,6 +16,7 @@
  *   Code snippets copied from veeceeoh, Daniel Terryn and Marcus Liljergren - with thanks.
  */
 
+// Ver: 2.5 - Added fingerprint for updated Heiman HS1SA-E
 // Ver: 2.4 - Fixed issue with calculation of battery percentage for devices that only provide raw voltage
 // Ver: 2.3 - Added fingerprints for Tuya TS0205 Smoke Alarms
 // Ver: 2.2 - Added debug for IAS Zone Status and ability to cater for devices with different battery voltages
@@ -49,11 +50,12 @@ metadata {
         attribute "batteryLastReplaced", "string"
         attribute "sensorLastTested", "string"
         attribute "lastStatus", "string"
-          
+      
         fingerprint profileID: "0104", deviceID: "0402", inClusters: "0000,0001,0003,0500,0502", outClusters: "0019", manufacturer: "HEIMAN", model: "SmokeSensor-EM", deviceJoinName: "HEIMAN Smoke Detector" //HEIMAN Smoke Sensor (HS1SA-E)
         fingerprint profileID: "0104", deviceID: "0402", inClusters: "0000,0003,0500,0001,0009,0502", outClusters: "0019", manufacturer: "HEIMAN", model: "SMOK_V16", deviceJoinName: "HEIMAN Smoke Detector M" //HEIMAN Smoke Sensor (HS1SA-M)
         fingerprint profileID: "0104", deviceID: "0402", inClusters: "0000,0003,0001,0500,0502,0B05", outClusters: "0019", manufacturer: "HEIMAN", model: "SmokeSensor-N-3.0", deviceJoinName: "HEIMAN Smoke Detector 3.0" //HEIMAN Smoke Sensor (HS1SA-E)
         fingerprint profileID: "0104", deviceID: "0402", inClusters: "0000,0001,0003,0500,0502,0B05", outClusters: "0019", manufacturer: "HEIMAN", model: "SmokeSensor-EF-3.0", deviceJoinName: "HEIMAN Smoke Detector" //HEIMAN Smoke Sensor 
+        fingerprint profileID: "0104", deviceID: "0402", inClusters: "0000,0001,0003,0020,0500,0502,0B05", outClusters: "0003,0019", manufacturer: "HEIMAN", model: "SmokeSensor-EF-3.0", deviceJoinName: "HEIMAN Smoke Detector" //HEIMAN Smoke Sensor (HS1SA-E)
         fingerprint profileId: "0104", deviceId: "0402", inClusters: "0000,0001,0003,000F,0020,0500,0502", outClusters: "000A,0019", manufacturer: "frient A/S", model :"SMSZB-120", deviceJoinName: "frient Smoke Detector" // frient Intelligent Smoke Alarm
         fingerprint profileId: "0104", deviceId: "0402", inClusters: "0000,0004,0005,0001,0500", outClusters: "0003,0004,0006,1000,000A,0019", manufacturer: "_TZ3210_up3pngle", model :"TS0205", deviceJoinName: "Tuya TS0205 Smoke Detector" // Tuya Smoke Alarm
         fingerprint profileId: "0104", deviceId: "0402", inClusters: "0000,0001,0003,0500", outClusters: "0003,0019", manufacturer: "_TYZB01_dsjszp0x", model :"TS0205", deviceJoinName: "Tuya TS0205 Smoke Detector" // Tuya Smoke Alarm
